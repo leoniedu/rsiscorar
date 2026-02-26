@@ -26,6 +26,7 @@ Imports:
     data.table,
     rlang (>= 1.1.0)
 Suggests:
+    jsonlite,
     ncdf4,
     piggyback,
     terra,
