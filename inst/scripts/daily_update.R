@@ -58,50 +58,6 @@ cli::cli_inform(
 cli::cli_inform("Areas: {paste(AREAS, collapse = ', ')}")
 
 # -----------------------------------------------------------------------------
-# Check GitHub for existing files (both releases)
-# -----------------------------------------------------------------------------
-
-github_grib_files <- character(0)
-github_geojson_files <- character(0)
-
-if (UPLOAD_TO_GITHUB && requireNamespace("piggyback", quietly = TRUE)) {
-  cli::cli_h2("Checking GitHub releases")
-
-  tryCatch(
-    {
-      existing <- piggyback::pb_list(repo = GITHUB_REPO, tag = release_tag)
-      if (nrow(existing) > 0) {
-        github_grib_files <- existing$file_name
-        cli::cli_inform(
-          "Found {length(github_grib_files)} GRIB file(s) on GitHub [{release_tag}]"
-        )
-      }
-    },
-    error = function(e) {
-      cli::cli_warn("Could not check GRIB release: {e$message}")
-    }
-  )
-
-  tryCatch(
-    {
-      existing <- piggyback::pb_list(
-        repo = GITHUB_REPO,
-        tag = geojson_release_tag
-      )
-      if (nrow(existing) > 0) {
-        github_geojson_files <- existing$file_name
-        cli::cli_inform(
-          "Found {length(github_geojson_files)} GeoJSON file(s) on GitHub [{geojson_release_tag}]"
-        )
-      }
-    },
-    error = function(e) {
-      cli::cli_warn("Could not check GeoJSON release: {e$message}")
-    }
-  )
-}
-
-# -----------------------------------------------------------------------------
 # Generate GRIBs and GeoJSONs
 # -----------------------------------------------------------------------------
 
@@ -127,26 +83,8 @@ for (area in AREAS) {
       )
     )
 
-    need_grib <- !basename(output_file) %in% github_grib_files &&
-      !file.exists(output_file)
-    need_geojson <- !basename(geojson_file) %in% github_geojson_files &&
-      !file.exists(geojson_file)
-
-    # Collect local-only files that still need uploading
-    if (
-      !need_grib &&
-        file.exists(output_file) &&
-        !basename(output_file) %in% github_grib_files
-    ) {
-      generated_grib_files <- c(generated_grib_files, output_file)
-    }
-    if (
-      !need_geojson &&
-        file.exists(geojson_file) &&
-        !basename(geojson_file) %in% github_geojson_files
-    ) {
-      generated_geojson_files <- c(generated_geojson_files, geojson_file)
-    }
+    need_grib <- !file.exists(output_file)
+    need_geojson <- !file.exists(geojson_file)
 
     if (!need_grib && !need_geojson) {
       cli::cli_inform("  {format(d, '%Y-%m-%d')}: both files present, skipping")
@@ -246,11 +184,50 @@ if (UPLOAD_TO_GITHUB && n_total > 0L) {
 }
 
 # -----------------------------------------------------------------------------
-# Cleanup old files
+# Verify uploads and cleanup old files
 # -----------------------------------------------------------------------------
 
-if (CLEANUP_OLD) {
-  cli::cli_h2("Cleanup")
+if (CLEANUP_OLD && UPLOAD_TO_GITHUB) {
+  cli::cli_h2("Verifying uploads & cleanup")
+
+  cli::cli_inform("Waiting 30s for GitHub to settle...")
+  Sys.sleep(30)
+
+  github_grib_files <- character(0)
+  github_geojson_files <- character(0)
+
+  tryCatch(
+    {
+      existing <- piggyback::pb_list(repo = GITHUB_REPO, tag = release_tag)
+      if (nrow(existing) > 0) {
+        github_grib_files <- existing$file_name
+        cli::cli_inform(
+          "Verified {length(github_grib_files)} GRIB file(s) on GitHub [{release_tag}]"
+        )
+      }
+    },
+    error = function(e) {
+      cli::cli_warn("Could not verify GRIB release: {e$message}")
+    }
+  )
+
+  tryCatch(
+    {
+      existing <- piggyback::pb_list(
+        repo = GITHUB_REPO,
+        tag = geojson_release_tag
+      )
+      if (nrow(existing) > 0) {
+        github_geojson_files <- existing$file_name
+        cli::cli_inform(
+          "Verified {length(github_geojson_files)} GeoJSON file(s) on GitHub [{geojson_release_tag}]"
+        )
+      }
+    },
+    error = function(e) {
+      cli::cli_warn("Could not verify GeoJSON release: {e$message}")
+    }
+  )
 
   all_local <- list.files(
     OUTPUT_DIR,
