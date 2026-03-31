@@ -36,3 +36,15 @@ test_that(".compute_v0u returns 13 values in 0-360 range", {
   s2_idx <- which(rsiscorar:::.CONSTITUENTS$name == "S2")
   expect_equal(v0u[s2_idx], 0, tolerance = 0.5)
 })
+
+test_that(".compute_nodal_factors returns 13 positive values near 1", {
+  f <- rsiscorar:::.compute_nodal_factors(as.Date("2026-03-31"))
+  expect_length(f, 13L)
+  expect_true(all(f > 0))
+  expect_true(all(f > 0.5 & f < 2.0))
+
+  s2_idx <- which(rsiscorar:::.CONSTITUENTS$name == "S2")
+  p1_idx <- which(rsiscorar:::.CONSTITUENTS$name == "P1")
+  expect_equal(f[s2_idx], 1.0)
+  expect_equal(f[p1_idx], 1.0)
+})

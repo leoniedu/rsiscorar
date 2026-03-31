@@ -194,3 +194,35 @@
 
   v0u %% 360
 }
+
+#' Compute nodal factors f for each SISCORAR constituent
+#'
+#' Adjusts amplitude based on the 18.6-year lunar nodal cycle.
+#'
+#' @param date Date or coercible to Date.
+#' @return Numeric vector of length 13 in .CONSTITUENTS order.
+#' @noRd
+.compute_nodal_factors <- function(date) {
+  a <- .compute_astro_args(as.Date(date))
+  N <- -a[["N_prime"]]
+  Nr <- N * pi / 180
+
+  f <- numeric(13L)
+  f_m2 <- 1.0004 - 0.0373 * cos(Nr) + 0.0002 * cos(2 * Nr)
+
+  f[1]  <- 1.0089 + 0.1871 * cos(Nr) - 0.0147 * cos(2 * Nr) + 0.0014 * cos(3 * Nr)  # O1
+  f[2]  <- 1.0                                                                          # S2
+  f[3]  <- 1.0060 + 0.1150 * cos(Nr) - 0.0088 * cos(2 * Nr) + 0.0006 * cos(3 * Nr)  # K1
+  f[4]  <- f_m2                                                                        # N2
+  f[5]  <- f_m2^2                                                                      # MN4
+  f[6]  <- f[1]                                                                        # Q1 = f(O1)
+  f[7]  <- 1.0241 + 0.2863 * cos(Nr) + 0.0083 * cos(2 * Nr) - 0.0015 * cos(3 * Nr)  # K2
+  f[8]  <- f_m2                                                                        # M2
+  f[9]  <- 1.0                                                                          # P1
+  f[10] <- f_m2^2                                                                      # M4
+  f[11] <- f_m2                                                                        # MS4
+  f[12] <- f_m2^3                                                                      # M6
+  f[13] <- f_m2^4                                                                      # M8
+
+  f
+}
