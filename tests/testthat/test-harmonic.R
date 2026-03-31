@@ -26,3 +26,13 @@ test_that(".read_harmonic_constants returns correct structure", {
   expect_true(all(dt$u_phase >= 0 & dt$u_phase < 360))
   expect_true(all(dt$v_phase >= 0 & dt$v_phase < 360))
 })
+
+test_that(".compute_v0u returns 13 values in 0-360 range", {
+  v0u <- rsiscorar:::.compute_v0u(as.Date("2026-03-31"))
+  expect_length(v0u, 13L)
+  expect_true(all(v0u >= 0 & v0u < 360))
+
+  # S2 should always be 0 at midnight
+  s2_idx <- which(rsiscorar:::.CONSTITUENTS$name == "S2")
+  expect_equal(v0u[s2_idx], 0, tolerance = 0.5)
+})

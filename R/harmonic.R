@@ -121,3 +121,76 @@
     phase = phase_vec
   )
 }
+
+# Astronomical arguments ---------------------------------------------------
+
+#' Compute 5 fundamental astronomical variables (Schureman 1958)
+#'
+#' @param date Date or coercible to Date.
+#' @return Named numeric vector (degrees, 0-360): s, h, p, N_prime, p1.
+#' @noRd
+.compute_astro_args <- function(date) {
+  jd <- as.numeric(as.Date(date)) + 2440587.5
+  T <- (jd - 2451545.0) / 36525.0
+
+  s <- 218.3164477 + 481267.88123421 * T - 0.0015786 * T^2 +
+    T^3 / 538841.0 - T^4 / 65194000.0
+  h <- 280.46646 + 36000.76983 * T + 0.0003032 * T^2
+  p <- 83.3532465 + 4069.0137287 * T - 0.0103200 * T^2 -
+    T^3 / 80053.0 + T^4 / 18999000.0
+  N <- 125.04452 - 1934.13626 * T + 0.0020708 * T^2 + T^3 / 450000.0
+  N_prime <- -N
+  p1 <- 282.93735 + 1.71946 * T + 0.00045 * T^2
+
+  args <- c(s = s, h = h, p = p, N_prime = N_prime, p1 = p1)
+  args %% 360
+}
+
+#' Compute V0+u for each SISCORAR constituent
+#'
+#' @param date Date or coercible to Date.
+#' @return Numeric vector of length 13 (degrees, 0-360) in .CONSTITUENTS order.
+#' @noRd
+.compute_v0u <- function(date) {
+  a <- .compute_astro_args(as.Date(date))
+  s <- a[["s"]]
+  h <- a[["h"]]
+  p <- a[["p"]]
+  N <- -a[["N_prime"]]
+  p1 <- a[["p1"]]
+  Nr <- N * pi / 180
+
+  # Nodal corrections xi and nu (Schureman)
+  xi <- -12.94 * sin(Nr) + 0.68 * sin(2 * Nr)
+  nu <- -5.09 * sin(Nr) - 0.44 * sin(2 * Nr)
+
+  # nu' for K1
+  nu_prime <- atan2(
+    sin(Nr) * 0.10948,
+    cos(Nr) * 0.10948 + 0.8886
+  ) * 180 / pi
+
+  # nu'' for K2
+  nu_double_prime <- atan2(
+    sin(2 * Nr) * 0.01164,
+    cos(2 * Nr) * 0.01164 + 0.6583
+  ) * 180 / pi
+
+  v0u <- numeric(13L)
+  # .CONSTITUENTS order: O1, S2, K1, N2, MN4, Q1, K2, M2, P1, M4, MS4, M6, M8
+  v0u[1]  <- h - 2 * s + 90 + 2 * xi - nu          # O1
+  v0u[2]  <- 0                                        # S2
+  v0u[3]  <- h + 90 - nu_prime                        # K1
+  v0u[4]  <- 2 * h - 3 * s + p + 2 * xi - nu         # N2
+  v0u[5]  <- 4 * h - 5 * s + p + 4 * xi - 2 * nu     # MN4
+  v0u[6]  <- h - 3 * s + p + 90 + 2 * xi - nu         # Q1
+  v0u[7]  <- 2 * h - 2 * nu_double_prime              # K2
+  v0u[8]  <- 2 * h - 2 * s + 2 * xi - 2 * nu          # M2
+  v0u[9]  <- -h + 270                                  # P1
+  v0u[10] <- 4 * h - 4 * s + 4 * xi - 4 * nu          # M4
+  v0u[11] <- 2 * h - 2 * s + 2 * xi - 2 * nu          # MS4
+  v0u[12] <- 6 * h - 6 * s + 6 * xi - 6 * nu          # M6
+  v0u[13] <- 8 * h - 8 * s + 8 * xi - 8 * nu          # M8
+
+  v0u %% 360
+}
