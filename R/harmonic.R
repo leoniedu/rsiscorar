@@ -226,3 +226,95 @@
 
   f
 }
+
+# Harmonic prediction -------------------------------------------------------
+
+#' Predict tidal currents at all nodes for a given date
+#'
+#' Performs harmonic summation for hours 0-23 at every node in the mesh.
+#'
+#' @param date Date or coercible to Date.
+#' @param area Character: bay name.
+#' @return data.table matching `read_predictions()` schema.
+#' @noRd
+.predict_at_nodes <- function(date, area) {
+  date <- as.Date(date)
+  area <- .validate_area(area)
+
+  hc <- .read_harmonic_constants(area)
+  v0u <- .compute_v0u(date)
+  f <- .compute_nodal_factors(date)
+  freqs <- .CONSTITUENTS$freq_deg_hr
+
+  # Reorder hc rows so constituent order matches .CONSTITUENTS within each node
+  cons_order <- .CONSTITUENTS$index
+  hc[, cons_rank := match(constituent, cons_order)]
+  data.table::setorder(hc, node, cons_rank)
+
+  nodes <- unique(hc[, .(node, lon, lat)])
+  n_nodes <- nrow(nodes)
+
+  # Build matrices (13 x n_nodes) — hc now has 13 rows per node in .CONSTITUENTS order
+
+  u_amp_mat <- matrix(hc$u_amplitude, nrow = 13L, ncol = n_nodes)
+  u_phase_mat <- matrix(hc$u_phase, nrow = 13L, ncol = n_nodes)
+  v_amp_mat <- matrix(hc$v_amplitude, nrow = 13L, ncol = n_nodes)
+  v_phase_mat <- matrix(hc$v_phase, nrow = 13L, ncol = n_nodes)
+
+  # Apply nodal factors (recycled along columns)
+  u_amp_mat <- u_amp_mat * f
+  v_amp_mat <- v_amp_mat * f
+
+  hours <- 0:23
+  n_hours <- 24L
+  total_rows <- n_nodes * n_hours
+  deg2rad <- pi / 180
+
+  out_u <- numeric(total_rows)
+  out_v <- numeric(total_rows)
+
+  for (hi in seq_along(hours)) {
+    h <- hours[hi]
+    phase_h <- (freqs * h + v0u) * deg2rad
+
+    u_sum <- numeric(n_nodes)
+    v_sum <- numeric(n_nodes)
+    for (c in seq_len(13L)) {
+      u_sum <- u_sum + u_amp_mat[c, ] * cos(phase_h[c] - u_phase_mat[c, ] * deg2rad)
+      v_sum <- v_sum + v_amp_mat[c, ] * cos(phase_h[c] - v_phase_mat[c, ] * deg2rad)
+    }
+
+    idx_start <- (hi - 1L) * n_nodes + 1L
+    idx_end <- hi * n_nodes
+    out_u[idx_start:idx_end] <- u_sum
+    out_v[idx_start:idx_end] <- v_sum
+  }
+
+  velocity <- sqrt(out_u^2 + out_v^2)
+  direction <- (atan2(out_u, out_v) * 180 / pi) %% 360
+
+  dt <- data.table::data.table(
+    col = rep(nodes$node, times = n_hours),
+    row = rep(1L, total_rows),
+    lon = rep(nodes$lon, times = n_hours),
+    lat = rep(nodes$lat, times = n_hours),
+    hour = rep(hours, each = n_nodes),
+    velocity_cm_s = velocity,
+    direction_deg = direction
+  )
+
+  dt[, `:=`(
+    datetime = as.POSIXct(
+      sprintf("%s %02d:00:00", date, hour),
+      tz = "America/Sao_Paulo"
+    ),
+    u_velocity = out_u,
+    v_velocity = out_v,
+    speed_m_s = velocity_cm_s / 100
+  )]
+
+  data.table::setcolorder(dt, c("col", "row", "lon", "lat", "datetime", "hour",
+                                 "velocity_cm_s", "speed_m_s", "direction_deg",
+                                 "u_velocity", "v_velocity"))
+  dt
+}

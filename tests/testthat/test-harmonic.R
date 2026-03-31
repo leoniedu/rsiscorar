@@ -48,3 +48,25 @@ test_that(".compute_nodal_factors returns 13 positive values near 1", {
   expect_equal(f[s2_idx], 1.0)
   expect_equal(f[p1_idx], 1.0)
 })
+
+test_that(".predict_at_nodes returns correct structure", {
+  skip_if_not_installed()
+
+  dt <- rsiscorar:::.predict_at_nodes(as.Date("2026-03-31"), "sepetiba")
+  expect_s3_class(dt, "data.table")
+
+  expected_cols <- c("col", "row", "lon", "lat", "datetime", "hour",
+                     "velocity_cm_s", "speed_m_s", "direction_deg",
+                     "u_velocity", "v_velocity")
+  expect_true(all(expected_cols %in% names(dt)))
+
+  n_nodes <- length(unique(dt[, paste(lon, lat)]))
+  expect_true(n_nodes > 1000)
+  expect_equal(nrow(dt), n_nodes * 24L)
+  expect_equal(sort(unique(dt$hour)), 0:23)
+  expect_true(all(dt$velocity_cm_s >= 0))
+  expect_true(all(dt$direction_deg >= 0 & dt$direction_deg < 360))
+  expect_equal(dt$speed_m_s, dt$velocity_cm_s / 100)
+  expect_s3_class(dt$datetime, "POSIXct")
+  expect_equal(attr(dt$datetime[1], "tzone"), "America/Sao_Paulo")
+})
