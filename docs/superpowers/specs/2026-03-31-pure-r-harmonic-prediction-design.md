@@ -143,7 +143,7 @@ Same change — loops `.predict_at_nodes()` instead of calling `run_prediction()
 
 Tests validate against the exe's output across a wide date range to exercise the full nodal cycle (18.6 years).
 
-**Test dates:** First of every month from 2000-01-01 to 2050-01-01 (601 dates). This covers ~2.7 full nodal cycles, ensuring V0+u and f computations are correct across the entire range of astronomical conditions.
+**Test dates:** 5 dates sampled from the first of every month between 2000-01-01 and 2050-01-01 (~2.7 nodal cycles). Fixed seed for reproducibility. Small K keeps fixture generation fast while still spanning the full astronomical range.
 
 **Memoisation:** Exe calls are expensive (~1s each). A test helper memoises `run_prediction()` + `read_predictions()` + FatNod.txt results keyed by (area, date). Results are cached in a test fixture directory (`tests/testthat/fixtures/`) so subsequent test runs don't re-invoke Wine. A one-time setup script generates the fixtures.
 
