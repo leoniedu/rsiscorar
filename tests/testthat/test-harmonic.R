@@ -99,3 +99,66 @@ test_that(".compute_v0u matches exe FatNod.txt across 2000-2050", {
     }
   }
 })
+
+test_that("prediction matches exe Grade.bin at closest co-located node", {
+  skip_if_not_installed()
+
+  fixtures_dir <- test_path("fixtures")
+  dates_file <- file.path(fixtures_dir, "test_dates.rds")
+  skip_if_not(file.exists(dates_file), "Fixtures not generated")
+
+  test_dates <- readRDS(dates_file)
+
+  for (d in test_dates) {
+    d <- as.Date(d, origin = "1970-01-01")
+    fname <- sprintf("fixture_sepetiba_%s.rds", format(d, "%Y%m%d"))
+    fixture <- readRDS(file.path(fixtures_dir, fname))
+
+    our_dt <- rsiscorar:::.predict_at_nodes(d, "sepetiba")
+    grade_dt <- fixture$grade
+
+    # Find the single mesh node closest to any Grade.bin node
+    our_h0 <- our_dt[hour == 0L]
+    grade_h0 <- grade_dt[hour == 0L]
+    best_i <- 0L
+    best_dist <- Inf
+    best_nearest <- 0L
+    for (i in seq_len(nrow(our_h0))) {
+      dists <- (grade_h0$lon - our_h0$lon[i])^2 +
+        (grade_h0$lat - our_h0$lat[i])^2
+      nearest <- which.min(dists)
+      if (sqrt(dists[nearest]) < best_dist) {
+        best_dist <- sqrt(dists[nearest])
+        best_i <- i
+        best_nearest <- nearest
+      }
+    }
+
+    # This node should be within ~0.00005 degrees
+    expect_lt(best_dist, 0.0001,
+              label = sprintf("No co-located node found for %s", d))
+
+    gcol <- grade_h0$col[best_nearest]
+    grow <- grade_h0$row[best_nearest]
+    our_node_id <- our_h0$col[best_i]
+
+    # Compare all 24 hours at this node
+    our_node <- our_dt[col == our_node_id]
+    grade_node <- grade_dt[col == gcol & row == grow]
+
+    for (h in 0:23) {
+      our_vel <- our_node[hour == h]$velocity_cm_s
+      exe_vel <- grade_node[hour == h]$velocity_cm_s
+
+      # Skip near-slack water where small absolute errors cause large relative errors
+      if (exe_vel < 2) next
+
+      pct_diff <- abs(our_vel - exe_vel) / exe_vel
+      expect_lt(
+        pct_diff, 0.05,
+        label = sprintf("Velocity mismatch %s h=%d: ours=%.2f exe=%.2f (%.1f%%)",
+                        d, h, our_vel, exe_vel, pct_diff * 100)
+      )
+    }
+  }
+})
