@@ -16,10 +16,21 @@ predict_currents(date, area = "guanabara", daylight_saving = FALSE)
 adjustment. Default: \code{FALSE}.}
 }
 \value{
-data.table with prediction results (see \code{\link[=read_predictions]{read_predictions()}}).
+data.table with prediction results. Columns: col, row, lon, lat,
+datetime, hour, velocity_cm_s, speed_m_s, direction_deg, u_velocity,
+v_velocity.
 }
 \description{
-Main entry point: runs the prediction executable and reads the binary results.
+Computes tidal current predictions using harmonic analysis at
+computational mesh nodes. Does not require Wine or external executables.
+}
+\details{
+Predictions are computed at the computational mesh nodes (~3,000 per area)
+using 13 tidal harmonic constituents. This is a pure R implementation that
+does not require Wine or the SISCORAR executables.
+
+For the full regular-grid output (~90,000+ nodes), use \code{\link[=run_prediction]{run_prediction()}}
+followed by \code{\link[=read_predictions]{read_predictions()}} (requires Wine on macOS/Linux).
 }
 \examples{
 \dontrun{
