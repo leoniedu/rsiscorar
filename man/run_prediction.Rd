@@ -24,8 +24,12 @@ On macOS/Linux, runs the Windows executable via Wine.
 On Windows, runs natively.
 }
 \details{
-The prediction writes results to Grade.bin in the area directory.
-Use \code{\link[=read_predictions]{read_predictions()}} to parse the results.
+Runs the SISCORAR Windows executable (via Wine on macOS/Linux) and writes
+results to Grade.bin. Use \code{\link[=read_predictions]{read_predictions()}} to parse the results.
+This gives full 142-constituent predictions on a regular grid (~90,000+
+nodes) but requires Wine. For most use cases, \code{\link[=predict_currents]{predict_currents()}} is
+preferred — it uses pure R harmonic computation with no external
+dependencies.
 }
 \examples{
 \dontrun{
@@ -35,5 +39,5 @@ run_prediction("2025-06-15", "santos")
 
 }
 \seealso{
-\code{\link[=predict_currents]{predict_currents()}} for a combined run+read workflow
+\code{\link[=predict_currents]{predict_currents()}} for the recommended Wine-free workflow
 }

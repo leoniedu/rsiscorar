@@ -6,13 +6,12 @@ Authors@R:
            email = "e.leoni@gmail.com",
            role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-0955-5232"))
-Description: Provides an R interface to the Brazilian Navy's SISCORAR
-    (Sistema de Correntes e Mares) tidal current prediction system.
-    Wraps the official SISCORAR prediction executables (via Wine on
-    macOS/Linux) to predict ocean currents for 5 Brazilian coastal
-    bays using 142 tidal harmonics. Reads binary prediction files,
-    queries currents at specific coordinates and times, and exports
-    to GRIB2 and NetCDF formats for marine navigation software.
+Description: Predicts ocean currents for 5 Brazilian coastal bays using
+    tidal harmonic analysis with 13 major constituents from the Brazilian
+    Navy's SISCORAR (Sistema de Correntes e Mares) system. Optionally
+    wraps the official SISCORAR executables (via Wine) for full
+    142-constituent regular-grid output. Exports to GRIB2, NetCDF, and
+    GeoJSON formats for marine navigation software.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -35,5 +34,5 @@ Suggests:
 Config/testthat/edition: 3
 SystemRequirements:
     SISCORAR 5.0 (https://www.marinha.mil.br/chm/dados-do-smm/corrente-de-mare),
-    Wine (macOS/Linux only, for running Windows prediction executables),
+    Wine (macOS/Linux, optional -- only needed for run_prediction() exe path),
     CDO and ecCodes (optional, for GRIB2 export)

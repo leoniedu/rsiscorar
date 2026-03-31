@@ -13,10 +13,14 @@
 #' @return Logical: `TRUE` if prediction completed successfully.
 #'
 #' @details
-#' The prediction writes results to Grade.bin in the area directory.
-#' Use [read_predictions()] to parse the results.
+#' Runs the SISCORAR Windows executable (via Wine on macOS/Linux) and writes
+#' results to Grade.bin. Use [read_predictions()] to parse the results.
+#' This gives full 142-constituent predictions on a regular grid (~90,000+
+#' nodes) but requires Wine. For most use cases, [predict_currents()] is
+#' preferred — it uses pure R harmonic computation with no external
+#' dependencies.
 #'
-#' @seealso [predict_currents()] for a combined run+read workflow
+#' @seealso [predict_currents()] for the recommended Wine-free workflow
 #'
 #' @examples
 #' \dontrun{
@@ -79,7 +83,8 @@ run_prediction <- function(date, area = "guanabara", daylight_saving = FALSE) {
 #'
 #' @return data.table with prediction results. Columns: col, row, lon, lat,
 #'   datetime, hour, velocity_cm_s, speed_m_s, direction_deg, u_velocity,
-#'   v_velocity.
+#'   v_velocity. Note: `col` is the computational mesh node ID (not a grid
+#'   column index) and `row` is always 1 (mesh nodes are unstructured).
 #'
 #' @details
 #' Predictions are computed at the computational mesh nodes (~3,000 per area)

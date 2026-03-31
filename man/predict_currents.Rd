@@ -18,7 +18,8 @@ adjustment. Default: \code{FALSE}.}
 \value{
 data.table with prediction results. Columns: col, row, lon, lat,
 datetime, hour, velocity_cm_s, speed_m_s, direction_deg, u_velocity,
-v_velocity.
+v_velocity. Note: \code{col} is the computational mesh node ID (not a grid
+column index) and \code{row} is always 1 (mesh nodes are unstructured).
 }
 \description{
 Computes tidal current predictions using harmonic analysis at

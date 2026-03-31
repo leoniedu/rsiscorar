@@ -6,7 +6,7 @@
 \alias{rsiscorar-package}
 \title{rsiscorar: Interface to the SISCORAR Tidal Current Prediction System}
 \description{
-Provides an R interface to the Brazilian Navy's SISCORAR (Sistema de Correntes e Mares) tidal current prediction system. Wraps the official SISCORAR prediction executables (via Wine on macOS/Linux) to predict ocean currents for 5 Brazilian coastal bays using 142 tidal harmonics. Reads binary prediction files, queries currents at specific coordinates and times, and exports to GRIB2 and NetCDF formats for marine navigation software.
+Predicts ocean currents for 5 Brazilian coastal bays using tidal harmonic analysis with 13 major constituents from the Brazilian Navy's SISCORAR (Sistema de Correntes e Mares) system. Optionally wraps the official SISCORAR executables (via Wine) for full 142-constituent regular-grid output. Exports to GRIB2, NetCDF, and GeoJSON formats for marine navigation software.
 }
 \seealso{
 Useful links:
