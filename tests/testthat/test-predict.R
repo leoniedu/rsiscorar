@@ -1,29 +1,37 @@
-skip_if_not_runnable <- function() {
+skip_if_not_installed <- function() {
   home <- tryCatch(siscorar_home(), error = function(e) "")
   skip_if_not(dir.exists(home), "SISCORAR not installed")
-
-  if (.Platform$OS.type != "windows") {
-    wine <- tryCatch(.detect_wine(), error = function(e) "")
-    skip_if_not(nzchar(wine), "Wine not installed")
-  }
 }
 
 test_that("predict_currents returns valid data for sepetiba", {
-  skip_if_not_runnable()
+  skip_if_not_installed()
 
-  # sepetiba is the smallest area (~5,400 nodes)
   dt <- predict_currents(Sys.Date(), "sepetiba")
   expect_s3_class(dt, "data.table")
-
-  if (nrow(dt) > 0) {
-    expect_true(all(c("lon", "lat", "hour", "velocity_cm_s", "direction_deg",
-                       "u_velocity", "v_velocity") %in% names(dt)))
-    expect_true(nrow(dt) > 100)
-  }
+  expect_true(nrow(dt) > 100)
+  expect_true(all(c("lon", "lat", "hour", "velocity_cm_s", "direction_deg",
+                     "u_velocity", "v_velocity", "speed_m_s",
+                     "datetime") %in% names(dt)))
+  expect_equal(sort(unique(dt$hour)), 0:23)
+  expect_s3_class(dt$datetime, "POSIXct")
 })
 
-test_that("run_prediction returns logical", {
-  skip_if_not_runnable()
+test_that("predict_currents_range combines multiple dates", {
+  skip_if_not_installed()
+
+  dt <- predict_currents_range("2026-03-30", "2026-03-31", "sepetiba")
+  expect_s3_class(dt, "data.table")
+  expect_true("date" %in% names(dt))
+  expect_equal(length(unique(dt$date)), 2L)
+})
+
+test_that("run_prediction still works with Wine", {
+  home <- tryCatch(siscorar_home(), error = function(e) "")
+  skip_if_not(dir.exists(home), "SISCORAR not installed")
+  if (.Platform$OS.type != "windows") {
+    wine <- tryCatch(rsiscorar:::.detect_wine(), error = function(e) "")
+    skip_if_not(nzchar(wine), "Wine not installed")
+  }
 
   result <- run_prediction(Sys.Date(), "sepetiba")
   expect_type(result, "logical")

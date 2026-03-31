@@ -72,11 +72,22 @@ run_prediction <- function(date, area = "guanabara", daylight_saving = FALSE) {
 
 #' Predict Currents for a Single Date
 #'
-#' Main entry point: runs the prediction executable and reads the binary results.
+#' Computes tidal current predictions using harmonic analysis at
+#' computational mesh nodes. Does not require Wine or external executables.
 #'
 #' @inheritParams run_prediction
 #'
-#' @return data.table with prediction results (see [read_predictions()]).
+#' @return data.table with prediction results. Columns: col, row, lon, lat,
+#'   datetime, hour, velocity_cm_s, speed_m_s, direction_deg, u_velocity,
+#'   v_velocity.
+#'
+#' @details
+#' Predictions are computed at the computational mesh nodes (~3,000 per area)
+#' using 13 tidal harmonic constituents. This is a pure R implementation that
+#' does not require Wine or the SISCORAR executables.
+#'
+#' For the full regular-grid output (~90,000+ nodes), use [run_prediction()]
+#' followed by [read_predictions()] (requires Wine on macOS/Linux).
 #'
 #' @examples
 #' \dontrun{
@@ -89,12 +100,13 @@ run_prediction <- function(date, area = "guanabara", daylight_saving = FALSE) {
 predict_currents <- function(date, area = "guanabara", daylight_saving = FALSE) {
   date <- as.Date(date)
   area <- .validate_area(area)
-  success <- run_prediction(date, area, daylight_saving)
-  if (!success) {
-    cli::cli_warn("Prediction failed for {.val {area}} on {.val {date}}")
-    return(data.table())
+  dt <- .predict_at_nodes(date, area)
+
+  if (daylight_saving && nrow(dt) > 0L) {
+    dt[, datetime := datetime + 3600L]
   }
-  read_predictions(area, date)
+
+  dt
 }
 
 #' Predict Currents for a Date Range
@@ -120,7 +132,6 @@ predict_currents_range <- function(start_date, end_date, area = "guanabara",
   dates <- seq(as.Date(start_date), as.Date(end_date), by = "day")
 
   results <- lapply(dates, function(d) {
-    cli::cli_h3("{d}")
     dt <- predict_currents(d, area, daylight_saving)
     if (nrow(dt) > 0L) dt[, date := d]
     dt
