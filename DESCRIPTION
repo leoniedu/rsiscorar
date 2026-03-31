@@ -7,11 +7,14 @@ Authors@R:
            role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-0955-5232"))
 Description: Predicts ocean currents for 5 Brazilian coastal bays using
-    tidal harmonic analysis with 13 major constituents from the Brazilian
-    Navy's SISCORAR (Sistema de Correntes e Mares) system. Optionally
-    wraps the official SISCORAR executables (via Wine) for full
-    142-constituent regular-grid output. Exports to GRIB2, NetCDF, and
-    GeoJSON formats for marine navigation software.
+    tidal harmonic analysis. The pure R path computes predictions at the
+    ADCIRC computational mesh nodes (~3,000 per bay) using 13 independently
+    fitted harmonic constituents, with no external dependencies.
+    Optionally wraps the official SISCORAR executables (via Wine) for
+    full 142-constituent output interpolated to a dense regular grid
+    (~90,000 nodes). Exports to GRIB2, NetCDF, and GeoJSON formats for
+    marine navigation software. SISCORAR is the Brazilian Navy's
+    (DHN/REMO) adaptation of the ADCIRC finite-element coastal ocean model.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
