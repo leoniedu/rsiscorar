@@ -141,12 +141,20 @@ Same change — loops `.predict_at_nodes()` instead of calling `run_prediction()
 
 ## Testing Strategy
 
-Tests validate against the exe's output:
+Tests validate against the exe's output across a wide date range to exercise the full nodal cycle (18.6 years).
 
-1. **V0+u validation**: For each area, run the exe for a known date, compare our `.compute_v0u()` against FatNod.txt. Tolerance: <0.5 degrees.
+**Test dates:** First of every month from 2000-01-01 to 2050-01-01 (601 dates). This covers ~2.7 full nodal cycles, ensuring V0+u and f computations are correct across the entire range of astronomical conditions.
 
-2. **Prediction validation**: For each area, run the exe, read Grade.bin, find output nodes nearest to computational mesh nodes, compare velocity and direction. Tolerance: velocity within 5% (accounts for minor interpolation effects), direction within 5 degrees.
+**Memoisation:** Exe calls are expensive (~1s each). A test helper memoises `run_prediction()` + `read_predictions()` + FatNod.txt results keyed by (area, date). Results are cached in a test fixture directory (`tests/testthat/fixtures/`) so subsequent test runs don't re-invoke Wine. A one-time setup script generates the fixtures.
 
-3. **Existing tests**: Current tests in `test-predict.R`, `test-read.R`, `test-query.R` should pass (may need minor adjustments for changed row counts).
+### Test cases
 
-Tests requiring Wine/exe are skipped via `testthat::skip_if_not()` when Wine is unavailable (CI environments).
+1. **V0+u validation**: For each test date and a representative area (sepetiba — small, fast), compare `.compute_v0u()` against the exe's FatNod.txt output. Tolerance: <0.5 degrees for all 13 constituents.
+
+2. **Nodal factor validation**: Compare predicted velocities with and without f correction against exe output. The f-corrected prediction should be closer to the exe across all test dates.
+
+3. **Prediction validation**: For each test date, compare our prediction at computational nodes against the nearest Grade.bin output nodes. Tolerance: velocity within 5%, direction within 5 degrees (at nodes where velocity > 1 cm/s).
+
+4. **Existing tests**: Current tests in `test-predict.R`, `test-read.R`, `test-query.R` updated for changed row counts.
+
+Tests requiring Wine/exe are skipped via `testthat::skip_if_not()` when Wine is unavailable (CI environments). Fixture-based tests run everywhere.
