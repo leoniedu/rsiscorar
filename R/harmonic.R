@@ -156,41 +156,33 @@
   s <- a[["s"]]
   h <- a[["h"]]
   p <- a[["p"]]
-  N <- -a[["N_prime"]]
+  N <- (360 - a[["N_prime"]]) %% 360  # recover positive N from N' = -N
   p1 <- a[["p1"]]
   Nr <- N * pi / 180
 
-  # Nodal corrections xi and nu (Schureman)
-  xi <- -12.94 * sin(Nr) + 0.68 * sin(2 * Nr)
-  nu <- -5.09 * sin(Nr) - 0.44 * sin(2 * Nr)
-
-  # nu' for K1
-  nu_prime <- atan2(
-    sin(Nr) * 0.10948,
-    cos(Nr) * 0.10948 + 0.8886
-  ) * 180 / pi
-
-  # nu'' for K2
-  nu_double_prime <- atan2(
-    sin(2 * Nr) * 0.01164,
-    cos(2 * Nr) * 0.01164 + 0.6583
-  ) * 180 / pi
+  # Nodal corrections (Schureman 1958, calibrated against SISCORAR exe)
+  # xi, nu, nu', nu'' are functions of N (longitude of lunar ascending node)
+  xi  <- 11.8713 * sin(Nr) - 1.3014 * sin(2 * Nr) + 0.1406 * sin(3 * Nr)
+  nu  <- 12.9379 * sin(Nr) - 1.3108 * sin(2 * Nr) + 0.1468 * sin(3 * Nr)
+  nu_prime <- 8.8831 * sin(Nr) - 0.6524 * sin(2 * Nr)
+  nu_double_prime <- 12.0786 * sin(Nr) - 1.2256 * sin(2 * Nr) +
+    0.1304 * sin(3 * Nr)
 
   v0u <- numeric(13L)
   # .CONSTITUENTS order: O1, S2, K1, N2, MN4, Q1, K2, M2, P1, M4, MS4, M6, M8
-  v0u[1]  <- h - 2 * s + 90 + 2 * xi - nu          # O1
-  v0u[2]  <- 0                                        # S2
-  v0u[3]  <- h + 90 - nu_prime                        # K1
-  v0u[4]  <- 2 * h - 3 * s + p + 2 * xi - nu         # N2
-  v0u[5]  <- 4 * h - 5 * s + p + 4 * xi - 2 * nu     # MN4
-  v0u[6]  <- h - 3 * s + p + 90 + 2 * xi - nu         # Q1
-  v0u[7]  <- 2 * h - 2 * nu_double_prime              # K2
-  v0u[8]  <- 2 * h - 2 * s + 2 * xi - 2 * nu          # M2
-  v0u[9]  <- -h + 270                                  # P1
-  v0u[10] <- 4 * h - 4 * s + 4 * xi - 4 * nu          # M4
-  v0u[11] <- 2 * h - 2 * s + 2 * xi - 2 * nu          # MS4
-  v0u[12] <- 6 * h - 6 * s + 6 * xi - 6 * nu          # M6
-  v0u[13] <- 8 * h - 8 * s + 8 * xi - 8 * nu          # M8
+  v0u[1]  <- h - 2 * s - 90 + 2 * xi - nu            # O1
+  v0u[2]  <- 0                                          # S2
+  v0u[3]  <- h + 90 - nu_prime                          # K1
+  v0u[4]  <- 2 * h - 3 * s + p + 2 * xi - 2 * nu        # N2
+  v0u[5]  <- 4 * h - 5 * s + p + 4 * xi - 4 * nu       # MN4
+  v0u[6]  <- h - 3 * s + p - 90 + 2 * xi - nu           # Q1
+  v0u[7]  <- 2 * h - 2 * nu_double_prime                # K2
+  v0u[8]  <- 2 * h - 2 * s + 2 * xi - 2 * nu            # M2
+  v0u[9]  <- -h + 270                                    # P1
+  v0u[10] <- 4 * h - 4 * s + 4 * xi - 4 * nu            # M4
+  v0u[11] <- 2 * h - 2 * s + 2 * xi - 2 * nu            # MS4
+  v0u[12] <- 6 * h - 6 * s + 6 * xi - 6 * nu            # M6
+  v0u[13] <- 8 * h - 8 * s + 8 * xi - 8 * nu            # M8
 
   v0u %% 360
 }
@@ -204,7 +196,7 @@
 #' @noRd
 .compute_nodal_factors <- function(date) {
   a <- .compute_astro_args(as.Date(date))
-  N <- -a[["N_prime"]]
+  N <- (360 - a[["N_prime"]]) %% 360
   Nr <- N * pi / 180
 
   f <- numeric(13L)

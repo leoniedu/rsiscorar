@@ -70,3 +70,32 @@ test_that(".predict_at_nodes returns correct structure", {
   expect_s3_class(dt$datetime, "POSIXct")
   expect_equal(attr(dt$datetime[1], "tzone"), "America/Sao_Paulo")
 })
+
+test_that(".compute_v0u matches exe FatNod.txt across 2000-2050", {
+  fixtures_dir <- test_path("fixtures")
+  dates_file <- file.path(fixtures_dir, "test_dates.rds")
+  skip_if_not(file.exists(dates_file), "Fixtures not generated")
+
+  test_dates <- readRDS(dates_file)
+
+  for (d in test_dates) {
+    d <- as.Date(d, origin = "1970-01-01")
+    fname <- sprintf("fixture_sepetiba_%s.rds", format(d, "%Y%m%d"))
+    fixture <- readRDS(file.path(fixtures_dir, fname))
+
+    our_v0u <- rsiscorar:::.compute_v0u(d)
+
+    # FatNod order matches .CONSTITUENTS order
+    exe_v0u <- fixture$v0u$v0u_deg
+
+    for (i in seq_along(our_v0u)) {
+      diff <- abs(our_v0u[i] - exe_v0u[i])
+      diff <- min(diff, 360 - diff)
+      expect_lt(
+        diff, 0.5,
+        label = sprintf("V0+u mismatch for constituent %d on %s: ours=%.2f exe=%.2f",
+                        rsiscorar:::.CONSTITUENTS$index[i], d, our_v0u[i], exe_v0u[i])
+      )
+    }
+  }
+})
