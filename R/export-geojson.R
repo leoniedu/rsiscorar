@@ -77,9 +77,9 @@ write_uv_geojson <- function(dt, output_file, resolution = 0.005,
     h <- hours[h_idx]
     dt_h <- dt_sub[hour == h]
     u_mat <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$u_velocity / 100,
-                             grid_lons, grid_lats)
+                             grid_lons, grid_lats, area = area)
     v_mat <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$v_velocity / 100,
-                             grid_lons, grid_lats)
+                             grid_lons, grid_lats, area = area)
     # Expand matrix to rows (lon varies fastest)
     idx <- which(!is.na(u_mat), arr.ind = TRUE)
     if (nrow(idx) > 0L) {

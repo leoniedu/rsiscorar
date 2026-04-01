@@ -4,7 +4,7 @@
 \alias{write_grib}
 \title{Write Predictions to GRIB2 File}
 \usage{
-write_grib(dt, output_file, hours = 0:23, resolution = NULL)
+write_grib(dt, output_file, hours = 0:23, resolution = NULL, area = NULL)
 }
 \arguments{
 \item{dt}{data.table: prediction data from \code{\link[=predict_currents]{predict_currents()}}.}

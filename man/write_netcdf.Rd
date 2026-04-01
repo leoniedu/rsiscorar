@@ -4,7 +4,7 @@
 \alias{write_netcdf}
 \title{Write Predictions to NetCDF File}
 \usage{
-write_netcdf(dt, output_file, hours = 0:23, resolution = NULL)
+write_netcdf(dt, output_file, hours = 0:23, resolution = NULL, area = NULL)
 }
 \arguments{
 \item{dt}{data.table: prediction data from \code{\link[=predict_currents]{predict_currents()}}.}

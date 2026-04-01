@@ -46,6 +46,94 @@
   system2("which", "grib_set", stdout = FALSE, stderr = FALSE) == 0L
 }
 
+# State codes for each bay area (IBGE)
+.area_state_codes <- list(
+  guanabara = 33L,   # RJ
+  sepetiba  = 33L,   # RJ
+  paranagua = c(41L, 35L),  # PR + SP (bay straddles border)
+  santos    = 35L,   # SP
+  baiatos   = 29L    # BA
+)
+
+# Cache for water masks (keyed by grid extent string)
+.mask_cache <- new.env(parent = emptyenv())
+
+#' Create a water mask for a regular grid using IBGE state boundaries
+#'
+#' @param grid_lons,grid_lats Numeric vectors defining the output grid axes.
+#' @param area Character: bay area name (used to select the correct state).
+#' @return Logical matrix (nlon x nlat): TRUE = water, FALSE = land.
+#' @noRd
+.water_mask <- function(grid_lons, grid_lats, area = NULL) {
+  n_lon <- length(grid_lons)
+  n_lat <- length(grid_lats)
+
+  # Check cache
+  cache_key <- paste(round(grid_lons[1], 5), round(grid_lons[n_lon], 5),
+                     round(grid_lats[1], 5), round(grid_lats[n_lat], 5),
+                     n_lon, n_lat, sep = "_")
+  if (exists(cache_key, envir = .mask_cache)) {
+    return(get(cache_key, envir = .mask_cache))
+  }
+
+  # Need terra + sf + geobr
+  pkgs_ok <- requireNamespace("terra", quietly = TRUE) &&
+             requireNamespace("sf", quietly = TRUE) &&
+             requireNamespace("geobr", quietly = TRUE)
+
+  if (!pkgs_ok) {
+    # Fallback: no masking
+    mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
+    assign(cache_key, mask, envir = .mask_cache)
+    return(mask)
+  }
+
+  # Determine which state(s) to load
+  state_codes <- if (!is.null(area) && area %in% names(.area_state_codes)) {
+    .area_state_codes[[area]]
+  } else {
+    # Default: load all states that might overlap the grid extent
+    unique(unlist(.area_state_codes))
+  }
+
+  land_sf <- tryCatch({
+    states <- lapply(state_codes, function(code) {
+      geobr::read_state(code_state = code, year = 2020, simplified = FALSE)
+    })
+    sf::st_union(do.call(rbind, states))
+  }, error = function(e) NULL)
+
+  if (is.null(land_sf)) {
+    mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
+    assign(cache_key, mask, envir = .mask_cache)
+    return(mask)
+  }
+
+  res_lon <- if (n_lon > 1L) grid_lons[2] - grid_lons[1] else 0.005
+  r <- terra::rast(
+    xmin = grid_lons[1] - res_lon / 2,
+    xmax = grid_lons[n_lon] + res_lon / 2,
+    ymin = grid_lats[1] - res_lon / 2,
+    ymax = grid_lats[n_lat] + res_lon / 2,
+    nrows = n_lat, ncols = n_lon,
+    crs = "EPSG:4674"  # SIRGAS 2000 (geobr native CRS)
+  )
+
+  land_v <- terra::vect(land_sf)
+  land_rast <- terra::rasterize(land_v, r, field = 1, background = 0)
+  land_mat <- terra::as.matrix(land_rast, wide = TRUE)
+
+  # terra matrices are nrow x ncol (lat x lon), we need lon x lat
+  mask <- t(land_mat) == 0  # 0 = water (background), 1 = land
+  # Reverse lat axis if grid_lats is increasing but terra rows are decreasing
+  if (n_lat > 1L && grid_lats[2] > grid_lats[1]) {
+    mask <- mask[, rev(seq_len(n_lat)), drop = FALSE]
+  }
+
+  assign(cache_key, mask, envir = .mask_cache)
+  mask
+}
+
 #' Interpolate scattered points to a regular grid
 #'
 #' Uses Delaunay triangulation (interp package) when available, otherwise
@@ -57,7 +145,7 @@
 #' @return Matrix of dimensions `length(grid_lons)` x `length(grid_lats)`.
 #'   Cells outside the convex hull of the input points are `NA`.
 #' @noRd
-.interp_to_grid <- function(lon, lat, values, grid_lons, grid_lats) {
+.interp_to_grid <- function(lon, lat, values, grid_lons, grid_lats, area = NULL) {
   if (requireNamespace("interp", quietly = TRUE)) {
     result <- tryCatch(
       interp::interp(
@@ -68,7 +156,12 @@
       ),
       error = function(e) NULL
     )
-    if (!is.null(result)) return(result$z)
+    if (!is.null(result)) {
+      if (!is.null(area) && area %in% names(.area_state_codes)) {
+        result$z[!.water_mask(grid_lons, grid_lats, area)] <- NA
+      }
+      return(result$z)
+    }
   } else {
     cli::cli_warn(c(
       "{.pkg interp} not installed; using nearest-cell snapping instead of Delaunay interpolation.",
@@ -100,5 +193,8 @@
     }
   }
   mat[counts > 1L] <- mat[counts > 1L] / counts[counts > 1L]
+  if (!is.null(area) && area %in% names(.area_state_codes)) {
+    mat[!.water_mask(grid_lons, grid_lats, area)] <- NA
+  }
   mat
 }

@@ -28,10 +28,12 @@ Imports:
     data.table,
     rlang (>= 1.1.0)
 Suggests:
+    geobr,
     interp,
     jsonlite,
     ncdf4,
     piggyback,
+    sf,
     terra,
     testthat (>= 3.0.0),
     withr

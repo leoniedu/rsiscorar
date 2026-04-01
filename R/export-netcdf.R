@@ -20,7 +20,8 @@
 #'
 #' @seealso [write_grib()]
 #' @export
-write_netcdf <- function(dt, output_file, hours = 0:23, resolution = NULL) {
+write_netcdf <- function(dt, output_file, hours = 0:23, resolution = NULL,
+                         area = NULL) {
   .check_ncdf4()
 
   date_val <- as.Date(dt$datetime[1])
@@ -70,10 +71,10 @@ write_netcdf <- function(dt, output_file, hours = 0:23, resolution = NULL) {
 
     u_array[, , h_idx] <- .interp_to_grid(dt_h$lon, dt_h$lat,
                                            dt_h$u_velocity / 100,
-                                           grid_lons, grid_lats)
+                                           grid_lons, grid_lats, area = area)
     v_array[, , h_idx] <- .interp_to_grid(dt_h$lon, dt_h$lat,
                                            dt_h$v_velocity / 100,
-                                           grid_lons, grid_lats)
+                                           grid_lons, grid_lats, area = area)
   }
 
   fill_val <- -9999

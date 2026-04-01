@@ -29,7 +29,8 @@
 #'
 #' @seealso [write_netcdf()]
 #' @export
-write_grib <- function(dt, output_file, hours = 0:23, resolution = NULL) {
+write_grib <- function(dt, output_file, hours = 0:23, resolution = NULL,
+                       area = NULL) {
   .check_ncdf4()
   .check_cdo()
   grib_set_ok <- .check_grib_set()
@@ -75,9 +76,9 @@ write_grib <- function(dt, output_file, hours = 0:23, resolution = NULL) {
     dt_h <- dt_subset[hour == h, .(lon, lat, u_velocity, v_velocity)]
 
     u_matrix <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$u_velocity / 100,
-                                grid_lons, grid_lats)
+                                grid_lons, grid_lats, area = area)
     v_matrix <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$v_velocity / 100,
-                                grid_lons, grid_lats)
+                                grid_lons, grid_lats, area = area)
 
     # Create temporary NetCDF
     nc_file <- tempfile(fileext = ".nc")
@@ -503,7 +504,7 @@ get_grib <- function(date, area = "guanabara", resolution = 0.001,
     )
   }
 
-  write_grib(dt, local_path, hours = 0:23, resolution = resolution)
+  write_grib(dt, local_path, hours = 0:23, resolution = resolution, area = area)
 
   if (!file.exists(local_path)) {
     cli::cli_abort("Failed to generate GRIB file.")
