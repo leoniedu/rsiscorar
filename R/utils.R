@@ -64,12 +64,13 @@
 #' @param area Character: bay area name (used to select the correct state).
 #' @return Logical matrix (nlon x nlat): TRUE = water, FALSE = land.
 #' @noRd
-.water_mask <- function(grid_lons, grid_lats, area = NULL) {
+.water_mask <- function(grid_lons, grid_lats, area = NULL,
+                        node_lon = NULL, node_lat = NULL) {
   n_lon <- length(grid_lons)
   n_lat <- length(grid_lats)
 
   # Check cache
-  cache_key <- paste(round(grid_lons[1], 5), round(grid_lons[n_lon], 5),
+  cache_key <- paste(area, round(grid_lons[1], 5), round(grid_lons[n_lon], 5),
                      round(grid_lats[1], 5), round(grid_lats[n_lat], 5),
                      n_lon, n_lat, sep = "_")
   if (exists(cache_key, envir = .mask_cache)) {
@@ -82,7 +83,6 @@
              requireNamespace("geobr", quietly = TRUE)
 
   if (!pkgs_ok) {
-    # Fallback: no masking
     mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
     assign(cache_key, mask, envir = .mask_cache)
     return(mask)
@@ -92,7 +92,6 @@
   state_codes <- if (!is.null(area) && area %in% names(.area_state_codes)) {
     .area_state_codes[[area]]
   } else {
-    # Default: load all states that might overlap the grid extent
     unique(unlist(.area_state_codes))
   }
 
@@ -107,6 +106,26 @@
     mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
     assign(cache_key, mask, envir = .mask_cache)
     return(mask)
+  }
+
+  # Cut out water area using concave hull of mesh nodes.
+  # IBGE state polygons cover bays/estuaries as "land" — the concave hull
+  # of known water points (mesh nodes) carves out the actual water body.
+  if (!is.null(node_lon) && !is.null(node_lat) && length(node_lon) > 3L) {
+    water_hull <- tryCatch({
+      pts_sf <- sf::st_as_sf(
+        data.frame(x = node_lon, y = node_lat),
+        coords = c("x", "y"), crs = sf::st_crs(land_sf)
+      )
+      sf::st_concave_hull(sf::st_union(pts_sf), ratio = 0.3)
+    }, error = function(e) NULL)
+
+    if (!is.null(water_hull)) {
+      land_sf <- tryCatch(
+        sf::st_difference(land_sf, water_hull),
+        error = function(e) land_sf
+      )
+    }
   }
 
   res_lon <- if (n_lon > 1L) grid_lons[2] - grid_lons[1] else 0.005
@@ -125,7 +144,6 @@
 
   # terra matrices are nrow x ncol (lat x lon), we need lon x lat
   mask <- t(land_mat) == 0  # 0 = water (background), 1 = land
-  # Reverse lat axis if grid_lats is increasing but terra rows are decreasing
   if (n_lat > 1L && grid_lats[2] > grid_lats[1]) {
     mask <- mask[, rev(seq_len(n_lat)), drop = FALSE]
   }
@@ -158,7 +176,8 @@
     )
     if (!is.null(result)) {
       if (!is.null(area) && area %in% names(.area_state_codes)) {
-        result$z[!.water_mask(grid_lons, grid_lats, area)] <- NA
+        result$z[!.water_mask(grid_lons, grid_lats, area,
+                              node_lon = lon, node_lat = lat)] <- NA
       }
       return(result$z)
     }
@@ -194,7 +213,8 @@
   }
   mat[counts > 1L] <- mat[counts > 1L] / counts[counts > 1L]
   if (!is.null(area) && area %in% names(.area_state_codes)) {
-    mat[!.water_mask(grid_lons, grid_lats, area)] <- NA
+    mat[!.water_mask(grid_lons, grid_lats, area,
+                     node_lon = lon, node_lat = lat)] <- NA
   }
   mat
 }
