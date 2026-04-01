@@ -69,15 +69,21 @@
       error = function(e) NULL
     )
     if (!is.null(result)) return(result$z)
+  } else {
+    cli::cli_warn(c(
+      "{.pkg interp} not installed; using nearest-cell snapping instead of Delaunay interpolation.",
+      "i" = "Install with {.code install.packages('interp')} for smoother output."
+    ), .frequency = "once", .frequency_id = "interp_missing")
   }
 
   # Fallback: snap to nearest cell and average
-  resolution <- if (length(grid_lons) > 1L) grid_lons[2] - grid_lons[1] else 1
+  lon_res <- if (length(grid_lons) > 1L) grid_lons[2] - grid_lons[1] else 1
+  lat_res <- if (length(grid_lats) > 1L) grid_lats[2] - grid_lats[1] else 1
   n_lon <- length(grid_lons)
   n_lat <- length(grid_lats)
 
-  lon_idx <- pmax(1L, pmin(n_lon, round((lon - grid_lons[1]) / resolution) + 1L))
-  lat_idx <- pmax(1L, pmin(n_lat, round((lat - grid_lats[1]) / resolution) + 1L))
+  lon_idx <- pmax(1L, pmin(n_lon, round((lon - grid_lons[1]) / lon_res) + 1L))
+  lat_idx <- pmax(1L, pmin(n_lat, round((lat - grid_lats[1]) / lat_res) + 1L))
 
   mat <- matrix(NA_real_, nrow = n_lon, ncol = n_lat)
   counts <- matrix(0L, nrow = n_lon, ncol = n_lat)

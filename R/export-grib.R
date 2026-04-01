@@ -81,7 +81,6 @@ write_grib <- function(dt, output_file, hours = 0:23, resolution = NULL) {
 
     # Create temporary NetCDF
     nc_file <- tempfile(fileext = ".nc")
-    on.exit(unlink(nc_file), add = TRUE)
 
     ref_time <- as.POSIXct(
       paste(date_val, sprintf("%02d:00:00", h)), tz = "UTC"
@@ -115,7 +114,7 @@ write_grib <- function(dt, output_file, hours = 0:23, resolution = NULL) {
     ncdf4::ncatt_put(nc, "time", "standard_name", "time")
     ncdf4::ncatt_put(nc, "time", "axis", "T")
     ncdf4::ncatt_put(nc, "time", "calendar", "standard")
-    ncdf4::ncatt_put(nc, 0, "Conventions", "CF-1.8")
+    ncdf4::ncatt_put(nc, 0, "Conventions", "CF-1.6")
     ncdf4::ncatt_put(nc, 0, "title", "SISCORAR Tidal Current Predictions")
     ncdf4::ncatt_put(nc, 0, "institution", "Brazilian Navy (DHN)")
 
