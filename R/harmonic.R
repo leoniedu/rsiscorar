@@ -256,19 +256,27 @@
   hours <- 0:23
   n_hours <- 24L
   total_rows <- n_nodes * n_hours
-  phase_rad <- outer(freqs, hours, `*`) * (pi / 180) + v0u * (pi / 180)
+  deg2rad <- pi / 180
+  phase_rad <- outer(freqs, hours, `*`) * deg2rad + v0u * deg2rad
 
-  out_u <- numeric(total_rows)
-  out_v <- numeric(total_rows)
+  # Vectorized harmonic summation across all hours and nodes.
+  # For each hour h and node n:
+  #   u[h,n] = sum_c( u_amp[c,n] * cos(phase[c,h] - u_phase[c,n]) )
+  # Using cos(a-b) = cos(a)cos(b) + sin(a)sin(b):
+  #   u[h,n] = sum_c( u_amp*cos_phase * cos_u_phase + u_amp*sin_phase * sin_u_phase )
+  #          = crossprod(u_amp*cos_u_phase, cos_phase) + crossprod(u_amp*sin_u_phase, sin_phase)
+  cos_phase <- cos(phase_rad)  # 13 x 24
+  sin_phase <- sin(phase_rad)  # 13 x 24
 
-  for (hi in seq_len(n_hours)) {
-    cos_u <- cos(phase_rad[, hi] - u_phase_rad)
-    cos_v <- cos(phase_rad[, hi] - v_phase_rad)
-    idx_start <- (hi - 1L) * n_nodes + 1L
-    idx_end <- hi * n_nodes
-    out_u[idx_start:idx_end] <- colSums(u_amp_mat * cos_u)
-    out_v[idx_start:idx_end] <- colSums(v_amp_mat * cos_v)
-  }
+  # u_result and v_result: n_nodes x 24 matrices
+  u_result <- crossprod(u_amp_mat * cos(u_phase_rad), cos_phase) +
+              crossprod(u_amp_mat * sin(u_phase_rad), sin_phase)
+  v_result <- crossprod(v_amp_mat * cos(v_phase_rad), cos_phase) +
+              crossprod(v_amp_mat * sin(v_phase_rad), sin_phase)
+
+  # Flatten: hours vary slowest (each hour block = n_nodes rows)
+  out_u <- as.vector(u_result)
+  out_v <- as.vector(v_result)
 
   velocity <- sqrt(out_u^2 + out_v^2)
   direction <- (atan2(out_u, out_v) * 180 / pi) %% 360
