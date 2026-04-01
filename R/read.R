@@ -267,6 +267,95 @@ read_constituents <- function(area = "guanabara") {
   dt
 }
 
+#' Read Interpolation Weights (Interp.bin)
+#'
+#' Reads the pre-computed barycentric interpolation weights used by the
+#' SISCORAR executables to interpolate harmonic predictions from the
+#' unstructured ADCIRC computational mesh nodes to the regular output grid.
+#'
+#' @inheritParams read_predictions
+#'
+#' @return data.table with 221,891 rows (Sepetiba) and columns:
+#' \describe{
+#'   \item{entry}{Sequential entry index (1-based).}
+#'   \item{n1, n2, n3}{Mesh node indices (1-based, matching U.bin node order).
+#'     Zero or entries with all-zero weights indicate nodes outside the ADCIRC
+#'     mesh domain or on its boundary.}
+#'   \item{w1, w2, w3}{Interpolation weights. For valid interior nodes,
+#'     these are approximately barycentric coordinates (sum near 1). Entries
+#'     where all three weights are zero correspond to grid nodes outside the
+#'     ADCIRC mesh or coincident with mesh boundary nodes.}
+#' }
+#'
+#' @details
+#' The Interp.bin file has 24 bytes per entry in the format:
+#' `n1:int32, w1:float32, n2:int32, w2:float32, n3:int32, w3:float32`.
+#'
+#' Each entry maps one output grid point to up to 3 ADCIRC mesh nodes with
+#' associated interpolation weights. The SISCORAR executable uses these to
+#' produce the dense regular-grid output in Grade.bin from the sparse mesh-node
+#' harmonic constants in U.bin/V.bin.
+#'
+#' The exact correspondence between Interp.bin entry indices and Grade.bin node
+#' positions requires knowing which nodes fall inside the ADCIRC mesh domain.
+#'
+#' @seealso [read_grid()], [read_predictions()], [predict_currents()]
+#'
+#' @examples
+#' \dontrun{
+#' interp <- read_interp("sepetiba")
+#' interp[w1 + w2 + w3 > 0.01]  # entries with valid weights
+#' hist(interp[w1 + w2 + w3 > 0.01, w1 + w2 + w3])  # weight sums
+#' }
+#'
+#' @export
+read_interp <- function(area = "guanabara") {
+  area      <- .validate_area(area)
+  interp_file <- file.path(get_area_path(area), "Interp.bin")
+
+  if (!file.exists(interp_file)) {
+    cli::cli_abort(c(
+      "{.path Interp.bin} not found for area {.val {area}}.",
+      "i" = "Run {.code siscorar_download_data()} to download data files."
+    ))
+  }
+
+  file_size       <- file.info(interp_file)$size
+  bytes_per_entry <- 24L
+  n_entries       <- file_size %/% bytes_per_entry
+
+  if (file_size %% bytes_per_entry != 0L) {
+    cli::cli_abort(
+      "Interp.bin size ({file_size} bytes) is not a multiple of {bytes_per_entry}."
+    )
+  }
+
+  raw <- readBin(interp_file, "raw", n = file_size)
+
+  # Vectorized extraction: entry_starts is 0-based byte offsets
+  entry_starts <- (seq_len(n_entries) - 1L) * bytes_per_entry
+
+  # n1, n2, n3: int32 at byte positions 1, 9, 17 within each entry
+  # w1, w2, w3: float32 at byte positions 5, 13, 21
+  make_idx <- function(offsets, entry_starts) {
+    as.vector(outer(offsets, entry_starts, `+`))
+  }
+
+  n1 <- readBin(raw[make_idx(1:4,   entry_starts)], "integer", n = n_entries, size = 4L, endian = "little")
+  w1 <- readBin(raw[make_idx(5:8,   entry_starts)], "double",  n = n_entries, size = 4L, endian = "little")
+  n2 <- readBin(raw[make_idx(9:12,  entry_starts)], "integer", n = n_entries, size = 4L, endian = "little")
+  w2 <- readBin(raw[make_idx(13:16, entry_starts)], "double",  n = n_entries, size = 4L, endian = "little")
+  n3 <- readBin(raw[make_idx(17:20, entry_starts)], "integer", n = n_entries, size = 4L, endian = "little")
+  w3 <- readBin(raw[make_idx(21:24, entry_starts)], "double",  n = n_entries, size = 4L, endian = "little")
+
+  data.table::data.table(
+    entry = seq_len(n_entries),
+    n1 = n1, w1 = w1,
+    n2 = n2, w2 = w2,
+    n3 = n3, w3 = w3
+  )
+}
+
 #' Display Area Information
 #'
 #' Prints summary information about a bay area including grid dimensions
