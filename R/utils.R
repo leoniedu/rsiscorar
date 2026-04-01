@@ -45,3 +45,54 @@
 .check_grib_set <- function() {
   system2("which", "grib_set", stdout = FALSE, stderr = FALSE) == 0L
 }
+
+#' Interpolate scattered points to a regular grid
+#'
+#' Uses Delaunay triangulation (interp package) when available, otherwise
+#' falls back to nearest-cell snapping with averaging.
+#'
+#' @param lon,lat Numeric vectors of point coordinates.
+#' @param values Numeric vector of values to interpolate.
+#' @param grid_lons,grid_lats Numeric vectors defining the output grid axes.
+#' @return Matrix of dimensions `length(grid_lons)` x `length(grid_lats)`.
+#'   Cells outside the convex hull of the input points are `NA`.
+#' @noRd
+.interp_to_grid <- function(lon, lat, values, grid_lons, grid_lats) {
+  if (requireNamespace("interp", quietly = TRUE)) {
+    result <- tryCatch(
+      interp::interp(
+        x = lon, y = lat, z = values,
+        xo = grid_lons, yo = grid_lats,
+        linear = TRUE, extrap = FALSE,
+        duplicate = "mean"
+      ),
+      error = function(e) NULL
+    )
+    if (!is.null(result)) return(result$z)
+  }
+
+  # Fallback: snap to nearest cell and average
+  resolution <- if (length(grid_lons) > 1L) grid_lons[2] - grid_lons[1] else 1
+  n_lon <- length(grid_lons)
+  n_lat <- length(grid_lats)
+
+  lon_idx <- pmax(1L, pmin(n_lon, round((lon - grid_lons[1]) / resolution) + 1L))
+  lat_idx <- pmax(1L, pmin(n_lat, round((lat - grid_lats[1]) / resolution) + 1L))
+
+  mat <- matrix(NA_real_, nrow = n_lon, ncol = n_lat)
+  counts <- matrix(0L, nrow = n_lon, ncol = n_lat)
+
+  for (k in seq_along(values)) {
+    i <- lon_idx[k]
+    j <- lat_idx[k]
+    if (is.na(mat[i, j])) {
+      mat[i, j] <- values[k]
+      counts[i, j] <- 1L
+    } else {
+      mat[i, j] <- mat[i, j] + values[k]
+      counts[i, j] <- counts[i, j] + 1L
+    }
+  }
+  mat[counts > 1L] <- mat[counts > 1L] / counts[counts > 1L]
+  mat
+}

@@ -68,20 +68,12 @@ write_netcdf <- function(dt, output_file, hours = 0:23, resolution = NULL) {
     h <- hours[h_idx]
     dt_h <- dt_subset[hour == h, .(lon, lat, u_velocity, v_velocity)]
 
-    dt_h[, `:=`(
-      lon_idx = pmax(1L, pmin(n_lon, round((lon - grid_lons[1]) / resolution) + 1L)),
-      lat_idx = pmax(1L, pmin(n_lat, round((lat - grid_lats[1]) / resolution) + 1L))
-    )]
-
-    grid_vals <- dt_h[, .(
-      u = mean(u_velocity) / 100,
-      v = mean(v_velocity) / 100
-    ), by = .(lon_idx, lat_idx)]
-
-    for (r in seq_len(nrow(grid_vals))) {
-      u_array[grid_vals$lon_idx[r], grid_vals$lat_idx[r], h_idx] <- grid_vals$u[r]
-      v_array[grid_vals$lon_idx[r], grid_vals$lat_idx[r], h_idx] <- grid_vals$v[r]
-    }
+    u_array[, , h_idx] <- .interp_to_grid(dt_h$lon, dt_h$lat,
+                                           dt_h$u_velocity / 100,
+                                           grid_lons, grid_lats)
+    v_array[, , h_idx] <- .interp_to_grid(dt_h$lon, dt_h$lat,
+                                           dt_h$v_velocity / 100,
+                                           grid_lons, grid_lats)
   }
 
   fill_val <- -9999

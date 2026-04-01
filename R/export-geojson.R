@@ -58,16 +58,41 @@ write_uv_geojson <- function(dt, output_file, resolution = 0.005,
 
   dt_sub <- dt[hour %in% hours]
 
-  dt_sub[, `:=`(
-    lon_r = round(lon / resolution) * resolution,
-    lat_r = round(lat / resolution) * resolution
-  )]
+  lon_range <- range(dt_sub$lon)
+  lat_range <- range(dt_sub$lat)
+  grid_lons <- seq(
+    floor(lon_range[1] / resolution) * resolution,
+    ceiling(lon_range[2] / resolution) * resolution,
+    by = resolution
+  )
+  grid_lats <- seq(
+    floor(lat_range[1] / resolution) * resolution,
+    ceiling(lat_range[2] / resolution) * resolution,
+    by = resolution
+  )
 
-  # Average u, v per grid cell per hour; convert cm/s -> m/s
-  grid <- dt_sub[, .(
-    u = mean(u_velocity) / 100,
-    v = mean(v_velocity) / 100
-  ), by = .(lon_r, lat_r, hour)]
+  # Interpolate u and v per hour, collect into long-form data.table
+  grid_list <- vector("list", length(hours))
+  for (h_idx in seq_along(hours)) {
+    h <- hours[h_idx]
+    dt_h <- dt_sub[hour == h]
+    u_mat <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$u_velocity / 100,
+                             grid_lons, grid_lats)
+    v_mat <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$v_velocity / 100,
+                             grid_lons, grid_lats)
+    # Expand matrix to rows (lon varies fastest)
+    idx <- which(!is.na(u_mat), arr.ind = TRUE)
+    if (nrow(idx) > 0L) {
+      grid_list[[h_idx]] <- data.table(
+        lon_r = grid_lons[idx[, 1]],
+        lat_r = grid_lats[idx[, 2]],
+        hour = h,
+        u = u_mat[idx],
+        v = v_mat[idx]
+      )
+    }
+  }
+  grid <- rbindlist(grid_list)
 
   grid[, `:=`(
     s = sqrt(u^2 + v^2),

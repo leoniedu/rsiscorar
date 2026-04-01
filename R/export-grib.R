@@ -74,23 +74,10 @@ write_grib <- function(dt, output_file, hours = 0:23, resolution = NULL) {
   for (h in hours) {
     dt_h <- dt_subset[hour == h, .(lon, lat, u_velocity, v_velocity)]
 
-    dt_h[, `:=`(
-      lon_idx = pmax(1L, pmin(n_lon, round((lon - grid_lons[1]) / resolution) + 1L)),
-      lat_idx = pmax(1L, pmin(n_lat, round((lat - grid_lats[1]) / resolution) + 1L))
-    )]
-
-    grid_vals <- dt_h[, .(
-      u = mean(u_velocity) / 100,
-      v = mean(v_velocity) / 100
-    ), by = .(lon_idx, lat_idx)]
-
-    u_matrix <- matrix(NA_real_, nrow = n_lon, ncol = n_lat)
-    v_matrix <- matrix(NA_real_, nrow = n_lon, ncol = n_lat)
-
-    for (r in seq_len(nrow(grid_vals))) {
-      u_matrix[grid_vals$lon_idx[r], grid_vals$lat_idx[r]] <- grid_vals$u[r]
-      v_matrix[grid_vals$lon_idx[r], grid_vals$lat_idx[r]] <- grid_vals$v[r]
-    }
+    u_matrix <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$u_velocity / 100,
+                                grid_lons, grid_lats)
+    v_matrix <- .interp_to_grid(dt_h$lon, dt_h$lat, dt_h$v_velocity / 100,
+                                grid_lons, grid_lats)
 
     # Create temporary NetCDF
     nc_file <- tempfile(fileext = ".nc")
