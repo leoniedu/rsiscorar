@@ -55,10 +55,11 @@ utils::globalVariables(c(
   ".", ".N", ".SD",
   "hour", "lon", "lat", "velocity_cm_s", "direction_deg",
   "u_velocity", "v_velocity", "speed_m_s",
-  "col", "row", "dist", "date",
+  "col", "row", "dist", "date", "datetime",
   "lon_idx", "lat_idx", "flag",
   "i_lon", "i_lat", "speed", "direction", "u", "v",
-  "frequency_deg_hour", "frequency_scaled"
+  "frequency_deg_hour", "frequency_scaled",
+  "node", "constituent", "lon_r", "lat_r"
 ))
 
 .onAttach <- function(libname, pkgname) {
