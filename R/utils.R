@@ -46,16 +46,20 @@
   system2("which", "grib_set", stdout = FALSE, stderr = FALSE) == 0L
 }
 
-# Cache for Natural Earth land polygons (loaded once per session)
-.ne_land_cache <- new.env(parent = emptyenv())
+# Cache for GSHHG coastline polygons (loaded once per session)
+.coast_cache <- new.env(parent = emptyenv())
 
 # Cache for water masks (keyed by grid extent string)
 .mask_cache <- new.env(parent = emptyenv())
 
-#' Create a water mask using Natural Earth 1:10m land polygons (GSHHG-derived)
+#' Create a water mask using bundled GSHHG full-resolution coastline
+#'
+#' Uses the pre-cropped Brazilian coast from GSHHG (Global Self-consistent,
+#' Hierarchical, High-resolution Geography Database) at ~130m resolution.
+#' Properly handles bays, estuaries, and islands.
 #'
 #' @param grid_lons,grid_lats Numeric vectors defining the output grid axes.
-#' @param area Character: bay area name (for cache key).
+#' @param area Character: bay area name (for cache key only).
 #' @return Logical matrix (nlon x nlat): TRUE = water, FALSE = land.
 #' @noRd
 .water_mask <- function(grid_lons, grid_lats, area = NULL) {
@@ -70,8 +74,7 @@
   }
 
   pkgs_ok <- requireNamespace("terra", quietly = TRUE) &&
-             requireNamespace("sf", quietly = TRUE) &&
-             requireNamespace("rnaturalearth", quietly = TRUE)
+             requireNamespace("sf", quietly = TRUE)
 
   if (!pkgs_ok) {
     mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
@@ -79,31 +82,37 @@
     return(mask)
   }
 
-  # Load Natural Earth 10m land polygons (cached per session)
-  if (!exists("land", envir = .ne_land_cache)) {
-    land_sf <- tryCatch({
-      sf::sf_use_s2(FALSE)
-      rnaturalearth::ne_download(
-        scale = 10, type = "land", category = "physical", returnclass = "sf"
-      )
-    }, error = function(e) NULL)
-
-    if (is.null(land_sf)) {
+  # Load bundled GSHHG coastline (cached per session)
+  if (!exists("coast", envir = .coast_cache)) {
+    gpkg <- system.file("extdata", "gshhg_brazil_coast.gpkg", package = "rsiscorar")
+    if (!nzchar(gpkg)) {
       mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
       assign(cache_key, mask, envir = .mask_cache)
       return(mask)
     }
-    assign("land", land_sf, envir = .ne_land_cache)
+    coast_sf <- tryCatch({
+      sf::sf_use_s2(FALSE)
+      sf::st_read(gpkg, quiet = TRUE)
+    }, error = function(e) NULL)
+
+    if (is.null(coast_sf)) {
+      mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
+      assign(cache_key, mask, envir = .mask_cache)
+      return(mask)
+    }
+    assign("coast", coast_sf, envir = .coast_cache)
   }
-  land_sf <- get("land", envir = .ne_land_cache)
+  coast_sf <- get("coast", envir = .coast_cache)
 
   # Crop to grid extent
-  bbox <- sf::st_bbox(
-    c(xmin = grid_lons[1], xmax = grid_lons[n_lon],
-      ymin = grid_lats[1], ymax = grid_lats[n_lat]),
-    crs = sf::st_crs(land_sf)
-  )
-  land_crop <- tryCatch(sf::st_crop(land_sf, bbox), error = function(e) NULL)
+  land_crop <- tryCatch({
+    bbox <- sf::st_bbox(
+      c(xmin = grid_lons[1], xmax = grid_lons[n_lon],
+        ymin = grid_lats[1], ymax = grid_lats[n_lat]),
+      crs = sf::st_crs(coast_sf)
+    )
+    sf::st_crop(coast_sf, bbox)
+  }, error = function(e) NULL)
 
   if (is.null(land_crop) || nrow(land_crop) == 0L) {
     mask <- matrix(TRUE, nrow = n_lon, ncol = n_lat)
@@ -125,7 +134,6 @@
   land_rast <- terra::rasterize(terra::vect(land_crop), r, field = 1, background = 0)
   land_mat <- terra::as.matrix(land_rast, wide = TRUE)
 
-  # terra matrices are nrow x ncol (lat x lon), we need lon x lat
   mask <- t(land_mat) == 0
   if (n_lat > 1L && grid_lats[2] > grid_lats[1]) {
     mask <- mask[, rev(seq_len(n_lat)), drop = FALSE]

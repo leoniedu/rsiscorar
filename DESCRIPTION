@@ -32,7 +32,6 @@ Suggests:
     jsonlite,
     ncdf4,
     piggyback,
-    rnaturalearth,
     sf,
     terra,
     testthat (>= 3.0.0),
