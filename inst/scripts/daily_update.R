@@ -101,7 +101,8 @@ for (area in AREAS) {
 
         if (nrow(dt) > 0) {
           if (need_grib) {
-            write_grib(dt, output_file, hours = 0:23, resolution = RESOLUTION)
+            write_grib(dt, output_file, hours = 0:23, resolution = RESOLUTION,
+                       area = area)
             generated_grib_files <- c(generated_grib_files, output_file)
             cli::cli_inform(
               "  {basename(output_file)}: done ({round(file.info(output_file)$size / 1024, 1)} KB)"
