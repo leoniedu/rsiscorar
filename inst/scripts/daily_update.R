@@ -8,7 +8,6 @@
 # =============================================================================
 
 library(rsiscorar)
-library(piggyback)
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
@@ -28,14 +27,18 @@ release_tag <- RESOLUTION_STR
 geojson_release_tag <- paste0("geojson", GEOJSON_RESOLUTION_STR)
 
 
-try(
-  piggyback::pb_new_release(repo = GITHUB_REPO, tag = release_tag),
-  silent = TRUE
-)
-try(
-  piggyback::pb_new_release(repo = GITHUB_REPO, tag = geojson_release_tag),
-  silent = TRUE
-)
+# Ensure releases exist (gh CLI)
+.ensure_release <- function(tag, repo) {
+  existing <- system2("gh", c("release", "view", tag, "--repo", repo),
+                      stdout = FALSE, stderr = FALSE)
+  if (existing != 0L) {
+    cli::cli_inform("Creating release {.val {tag}}")
+    system2("gh", c("release", "create", tag, "--repo", repo,
+                    "--title", tag, "--notes", "Data release"))
+  }
+}
+.ensure_release(release_tag, GITHUB_REPO)
+.ensure_release(geojson_release_tag, GITHUB_REPO)
 
 
 # -----------------------------------------------------------------------------
@@ -137,23 +140,20 @@ for (area in AREAS) {
 # -----------------------------------------------------------------------------
 
 upload_to_release <- function(files, tag, label) {
-  if (length(files) == 0L) {
-    return(invisible(0L))
-  }
+  if (length(files) == 0L) return(invisible(0L))
 
   cli::cli_inform("  Release [{tag}]: {length(files)} {label} file(s)")
   n_uploaded <- 0L
   for (f in files) {
     cli::cli_inform("    Uploading: {basename(f)}")
-    tryCatch(
-      {
-        piggyback::pb_upload(f, repo = GITHUB_REPO, tag = tag, overwrite = TRUE)
-        n_uploaded <- n_uploaded + 1L
-      },
-      error = function(e) {
-        cli::cli_warn("    Failed: {basename(f)}: {e$message}")
-      }
-    )
+    rc <- system2("gh", c("release", "upload", tag, f,
+                          "--repo", GITHUB_REPO, "--clobber"),
+                  stdout = FALSE, stderr = FALSE)
+    if (rc == 0L) {
+      n_uploaded <- n_uploaded + 1L
+    } else {
+      cli::cli_warn("    Failed: {basename(f)}")
+    }
   }
   n_uploaded
 }
@@ -162,26 +162,9 @@ n_total <- length(generated_grib_files) + length(generated_geojson_files)
 
 if (UPLOAD_TO_GITHUB && n_total > 0L) {
   cli::cli_h2("Uploading to GitHub")
-
-  if (!requireNamespace("piggyback", quietly = TRUE)) {
-    cli::cli_warn("piggyback package not installed, skipping upload")
-  } else {
-    tryCatch(
-      {
-        n_up <- 0L
-        n_up <- n_up +
-          upload_to_release(generated_grib_files, release_tag, "GRIB")
-        n_up <- n_up +
-          upload_to_release(
-            generated_geojson_files,
-            geojson_release_tag,
-            "GeoJSON"
-          )
-        cli::cli_alert_success("Upload complete: {n_up}/{n_total} files")
-      },
-      error = function(e) cli::cli_warn("Upload failed: {e$message}")
-    )
-  }
+  n_up <- upload_to_release(generated_grib_files, release_tag, "GRIB") +
+          upload_to_release(generated_geojson_files, geojson_release_tag, "GeoJSON")
+  cli::cli_alert_success("Upload complete: {n_up}/{n_total} files")
 }
 
 # -----------------------------------------------------------------------------
@@ -191,50 +174,20 @@ if (UPLOAD_TO_GITHUB && n_total > 0L) {
 if (CLEANUP_OLD && UPLOAD_TO_GITHUB) {
   cli::cli_h2("Verifying uploads & cleanup")
 
-  cli::cli_inform("Waiting 30s for GitHub to settle...")
-  Sys.sleep(30)
+  .list_release_assets <- function(tag) {
+    out <- system2("gh", c("release", "view", tag, "--repo", GITHUB_REPO,
+                           "--json", "assets", "--jq", ".assets[].name"),
+                   stdout = TRUE, stderr = FALSE)
+    if (length(out) > 0L) out else character(0)
+  }
 
-  github_grib_files <- character(0)
-  github_geojson_files <- character(0)
+  github_grib_files <- .list_release_assets(release_tag)
+  cli::cli_inform("Verified {length(github_grib_files)} GRIB file(s) on GitHub [{release_tag}]")
 
-  tryCatch(
-    {
-      existing <- piggyback::pb_list(repo = GITHUB_REPO, tag = release_tag)
-      if (nrow(existing) > 0) {
-        github_grib_files <- existing$file_name
-        cli::cli_inform(
-          "Verified {length(github_grib_files)} GRIB file(s) on GitHub [{release_tag}]"
-        )
-      }
-    },
-    error = function(e) {
-      cli::cli_warn("Could not verify GRIB release: {e$message}")
-    }
-  )
+  github_geojson_files <- .list_release_assets(geojson_release_tag)
+  cli::cli_inform("Verified {length(github_geojson_files)} GeoJSON file(s) on GitHub [{geojson_release_tag}]")
 
-  tryCatch(
-    {
-      existing <- piggyback::pb_list(
-        repo = GITHUB_REPO,
-        tag = geojson_release_tag
-      )
-      if (nrow(existing) > 0) {
-        github_geojson_files <- existing$file_name
-        cli::cli_inform(
-          "Verified {length(github_geojson_files)} GeoJSON file(s) on GitHub [{geojson_release_tag}]"
-        )
-      }
-    },
-    error = function(e) {
-      cli::cli_warn("Could not verify GeoJSON release: {e$message}")
-    }
-  )
-
-  all_local <- list.files(
-    OUTPUT_DIR,
-    pattern = "\\.(grib2|geojson)$",
-    full.names = TRUE
-  )
+  all_local <- list.files(OUTPUT_DIR, pattern = "\\.(grib2|geojson)$", full.names = TRUE)
 
   for (f in all_local) {
     date_str <- gsub(".*_(\\d{8})_.*$", "\\1", basename(f))

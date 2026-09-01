@@ -31,7 +31,6 @@ Suggests:
     interp,
     jsonlite,
     ncdf4,
-    piggyback,
     sf,
     terra,
     testthat (>= 3.0.0),

@@ -54,4 +54,4 @@ The pipeline is: **configure → run prediction exe → read binary → query/ex
 
 ## Daily Update Script
 
-`inst/scripts/daily_update.R` generates rolling 90-day GRIB2+GeoJSON forecasts and uploads to GitHub releases on `leoniedu/siscorar_gribs` via piggyback. Configured via launchd plist in `inst/launchd/`.
+`inst/scripts/daily_update.R` generates rolling 90-day GRIB2+GeoJSON forecasts and uploads to GitHub releases on `leoniedu/siscorar_gribs` via the `gh` CLI. Configured via launchd plist in `inst/launchd/`.
